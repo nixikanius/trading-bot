@@ -1,0 +1,9 @@
+services:
+  trading-bot:
+    build: .
+    container_name: trading-bot
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./config.yml:/app/config.yml:ro
+    restart: unless-stopped

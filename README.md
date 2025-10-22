@@ -61,6 +61,17 @@ Edit `config.yml` with your settings.
 
 ## Running
 
+### Docker
+
+```bash
+docker run -it --name trading-bot \
+  -p 8000:8000 \
+  -v $(PWD)/config.yml:/app/config.yml:ro \
+  nixikanius/trading-bot:latest
+```
+
+Server starts on `http://127.0.0.1:8000`
+
 ### Local Development
 
 ```bash
@@ -72,26 +83,7 @@ make run
 ```
 
 **Note:** To stop the server, use `Ctrl+C` for graceful shutdown. The server handles SIGINT and SIGTERM signals properly.
-
 **Debug Logging:** Set `log_level: "DEBUG"` in `config.yml` to see detailed request/response logging for debugging purposes.
-
-### Docker
-
-```bash
-# Build image
-make docker-build
-
-# Run container
-make docker-run
-```
-
-### Docker Compose
-
-```bash
-docker-compose up -d
-```
-
-Server starts on `http://127.0.0.1:8000`
 
 ## HTTP API Endpoints
 

@@ -40,9 +40,11 @@ clean:
 
 # Docker
 docker-build:
+	@echo "Building docker image $(DOCKER_IMAGE) for version $(VERSION) (platforms $(DOCKER_PLATFORMS))..."
 	docker buildx build --platform $(DOCKER_PLATFORMS) -t $(DOCKER_IMAGE):$(VERSION) .
 
-docker-push:
+docker-push:	
+	@echo "Pushing docker image $(DOCKER_IMAGE) for version $(VERSION) (platforms $(DOCKER_PLATFORMS))..."
 	docker buildx build --platform $(DOCKER_PLATFORMS) -t $(DOCKER_IMAGE):$(VERSION) --push .
 
 docker-run:

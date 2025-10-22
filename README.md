@@ -82,7 +82,6 @@ make install
 make run
 ```
 
-**Note:** To stop the server, use `Ctrl+C` for graceful shutdown. The server handles SIGINT and SIGTERM signals properly.
 **Debug Logging:** Set `log_level: "DEBUG"` in `config.yml` to see detailed request/response logging for debugging purposes.
 
 ## HTTP API Endpoints

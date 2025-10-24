@@ -79,7 +79,7 @@ def init_app():
     # Handle HTTP exceptions first (404, 400, 405, etc.)
     @app.errorhandler(HTTPException)
     def handle_http_exception(e):
-        logger.warning(f"HTTP error: {e.code} - {e.description}")
+        logger.warning(f"HTTP error: {e.code} - {HTTPStatus(e.code).phrase}")
         return jsonify({
             "error": "HTTP error",
             "code": e.code,

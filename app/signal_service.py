@@ -52,7 +52,7 @@ class SignalService:
             ensure_orders = self._handle_position_signal(signal, instrument)
         
         ensure_orders = self.svc.pull_ensure_orders_state(instrument.instrument_type, ensure_orders)
-        slippage = self._calculate_slippage(instrument, signal, ensure_orders)
+        slippage = self._calculate_slippage(signal, ensure_orders)
         profit = self._calculate_profit(instrument, init_position, ensure_orders)
         position = self.svc.get_position_waiting_for_price(signal.figi)
         stop_orders = self.svc.get_current_stop_orders(signal.figi)
@@ -115,7 +115,7 @@ class SignalService:
             take_price=signal.limit_price
         )
     
-    def _calculate_slippage(self, instrument: InstrumentInfo, signal: Signal, ensure_orders: list[EnsurePositionOrder]) -> dict:
+    def _calculate_slippage(self, signal: Signal, ensure_orders: list[EnsurePositionOrder]) -> dict:
         """Calculate slippage from signal and ensure orders"""
         if not signal.entry_price and not signal.entry_time:
             return {}
@@ -127,7 +127,11 @@ class SignalService:
                 price_slippage = None
                 if signal.entry_price:
                     order_price = ensure_order.state.price
-                    price_slippage = order_price - signal.entry_price
+                    # slippage > 0: losing money, slippage < 0: making money
+                    if ensure_order.action in ["open_short", "close_long"]:
+                        price_slippage = signal.entry_price - order_price
+                    else:
+                        price_slippage = order_price - signal.entry_price
                     
                 time_slippage = None
                 if signal.entry_time:

@@ -160,6 +160,9 @@ class SignalService:
         profit = 0.0
         profit_orders = [eo for eo in ensure_orders if eo.action == action_filter]
 
+        if not profit_orders:
+            return None
+
         for ensure_order in profit_orders:
             qty = ensure_order.quantity * instrument.lot_size * (instrument.basic_asset_size or 1)
             profit += profit_multiplier * (ensure_order.state.price - position.average_price) * qty

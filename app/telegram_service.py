@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import requests
+from app.config import TelegramConfig
 from app.logger import get_logger
 from app.utils import format_duration
 
@@ -8,17 +9,16 @@ logger = get_logger(__name__)
 
 
 class TelegramService:
-    def __init__(self, bot_token: str, chat_id: str):
-        self.bot_token = bot_token
-        self.chat_id = chat_id
-        self.base_url = f"https://api.telegram.org/bot{bot_token}"
+    def __init__(self, config: TelegramConfig):
+        self.config = config
+        self.base_url = f"https://api.telegram.org/bot{config.bot_token}"
 
     def send_message(self, text: str) -> bool:
         """Send message to Telegram chat"""
         try:
             url = f"{self.base_url}/sendMessage"
             payload = {
-                "chat_id": self.chat_id,
+                "chat_id": self.config.chat_id,
                 "text": text,
                 "parse_mode": "HTML"
             }
@@ -50,7 +50,7 @@ class TelegramService:
 
         message = f"🛎️ <b>Trading Signal</b>\n\n"
         message += f"<i>{account}</i>\n"
-        message += f"{signal['figi']}: {position_emoji} <b>{signal['position'].upper()}</b>\n"
+        message += f"{signal['instrument']['ticker']}@{signal['instrument']['class_code']}: {position_emoji} <b>{signal['position'].upper()}</b>\n"
 
         # Signal entry data
         signal_entry_data = []
@@ -71,7 +71,7 @@ class TelegramService:
             for order in ensure_orders:
                 if order.type in ['buy', 'sell']:
                     order_emoji = "⬆️" if order.type == 'buy' else "⬇️"
-                    order_message = f"{order_emoji} {order.type.upper()} {order.quantity} lots @ {order.state.price} ({order.action}), com. {order.state.commission}"
+                    order_message = f"{order_emoji} {order.type.upper()} {order.quantity} lots @ {order.result.price} ({order.action})"
 
                     order_slippage = result['slippage'].get(order.order_id, {})
                     
@@ -105,14 +105,9 @@ class TelegramService:
             message += "\n⏳ <b>Stop Orders</b>\n"
 
             for order in sorted(stop_orders, key=lambda x: x.order_type):
-                if order.order_type == 'stop_loss':
-                    order_type = "⛔ SL"
-                    price = order.stop_price
-                else:
-                    order_type = "🎯 TP"
-                    price = order.price
-                
+                order_type = "⛔ SL" if order.order_type == 'stop_loss' else "🎯 TP"
                 action = f"⬆️ {order.direction.upper()}" if order.direction == 'buy' else f"⬇️ {order.direction.upper()}"
-                message += f"{order_type}: {action} {order.quantity} lots @ <b>{price}</b> ({order.exchange_order_type})\n"
+                
+                message += f"{order_type}: {action} {order.quantity} lots @ <b>{order.stop_price}</b> ({order.exchange_order_type[0].upper()})\n"
         
         return message

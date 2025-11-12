@@ -9,7 +9,8 @@ from datetime import datetime
 from app.schemas import Signal
 from app.logger import get_logger, set_thread_context
 from app.config import AccountConfig, TelegramConfig
-from app.signal_service import SignalService, TradingError
+from app.signal_service import SignalService
+from app.brokers import TradingError
 from app.telegram_service import TelegramService
 from tinkoff.invest.exceptions import RequestError
 
@@ -30,12 +31,12 @@ class SignalQueue:
     """In-memory signal queue with async processing"""
     
     def __init__(self, account_configs: Dict[str, AccountConfig], telegram_config: TelegramConfig):
-        self._processing: Dict[str, QueuedSignal] = {}  # key: f"{account}/{figi}" -> currently processing signal
-        self._waiting: Dict[str, QueuedSignal] = {}  # key: f"{account}/{figi}" -> waiting signal
+        self._processing: Dict[str, QueuedSignal] = {}  # key: f"{account}/{instrument}" -> currently processing signal
+        self._waiting: Dict[str, QueuedSignal] = {}  # key: f"{account}/{instrument}" -> waiting signal
         self._lock = threading.Lock()
         self._executor = ThreadPoolExecutor(max_workers=10, thread_name_prefix="signal_worker")
 
-        self._telegram_service = TelegramService(telegram_config.bot_token, telegram_config.chat_id)
+        self._telegram_service = TelegramService(telegram_config)
         
         # Create signal services for all accounts
         self._signal_services: Dict[str, SignalService] = {}
@@ -61,7 +62,7 @@ class SignalQueue:
             - _waiting: Next signal to execute (max 1 per key)
         """
         
-        key = f"{account}/{signal.figi}"
+        key = f"{account}/{signal.instrument}"
         signal_id = signal.signal_id
         
         with self._lock:
@@ -151,7 +152,7 @@ class SignalQueue:
         processing_duration_s = (queued_signal.processing_end_time - queued_signal.processing_start_time).total_seconds()
         total_duration_s = (queued_signal.processing_end_time - queued_signal.enqueue_time).total_seconds()
 
-        logger.info(f"Timing info: queue={queue_duration_s:.3f}s, processing={processing_duration_s:.3f}s, total={total_duration_s:.3f}s")
+        logger.info(f"Processing time: queue={queue_duration_s:.3f}s, processing={processing_duration_s:.3f}s, total={total_duration_s:.3f}s")
     
     def _send_error_notification(self, queued_signal: QueuedSignal, error: str, details: str):
         """Send error notification to Telegram"""
@@ -161,7 +162,7 @@ class SignalQueue:
             
             message = f"❌ <b>{error}</b>\n\n"
             message += f"<i>{queued_signal.account}</i>\n"
-            message += f"{queued_signal.signal.figi}: {position_emoji} <b>{position.upper()}</b>\n\n"
+            message += f"{queued_signal.signal.instrument}: {position_emoji} <b>{position.upper()}</b>\n\n"
             message += f"{details}"
             
             self._telegram_service.send_message(message)

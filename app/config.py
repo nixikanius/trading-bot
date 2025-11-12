@@ -1,63 +1,47 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import yaml
+from pydantic import BaseModel, Field, ValidationError, model_validator
 
 
-@dataclass(frozen=True)
-class AccountConfig:
-    api_token: str
-    account_id: str
-    sandbox_mode: bool
+class AccountConfig(BaseModel):
+    broker: str
+    context: dict[str, Any]
 
+class ServerConfig(BaseModel):
+    log_level: str = "INFO"
 
-@dataclass(frozen=True)
-class ServerConfig:
-    log_level: str
-
-@dataclass(frozen=True)
-class TelegramConfig:
+class TelegramConfig(BaseModel):
     bot_token: str
-    chat_id: str
+    chat_id: int
 
-
-@dataclass(frozen=True)
-class AppConfig:
-    server: ServerConfig
-    telegram: TelegramConfig
+class AppConfig(BaseModel):
+    server: ServerConfig = Field(default_factory=lambda: ServerConfig())
+    telegram: TelegramConfig = Field(default_factory=lambda: TelegramConfig())
     accounts: dict[str, AccountConfig]
+    
+    @model_validator(mode='before')
+    @classmethod
+    def validate_accounts(cls, data: dict[str, Any]) -> dict[str, Any]:
+        if isinstance(data, dict) and "accounts" in data:
+            if isinstance(data["accounts"], dict):
+                accounts_data = {}
+                for name, account_data in data["accounts"].items():
+                    try:
+                        accounts_data[name] = AccountConfig(**account_data)
+                    except ValidationError as e:
+                        raise ValueError(f"Account '{name}' configuration error: {e}") from e
+                
+                data["accounts"] = accounts_data
+        
+        return data
 
 
 def load_config(path: str | Path) -> AppConfig:
     with open(path, "r", encoding="utf-8") as f:
         data = yaml.safe_load(f)
-
-    # Load server configuration with defaults
-    server_data = data.get("server", {})
-    server_config = ServerConfig(
-        log_level=server_data.get("log_level", "INFO")
-    )
     
-    # Load telegram configuration
-    telegram_data = data.get("telegram", {})
-    telegram_config = TelegramConfig(
-        bot_token=telegram_data.get("bot_token", ""),
-        chat_id=telegram_data.get("chat_id", "")
-    )
-
-    # Load accounts configuration
-    accounts: dict[str, AccountConfig] = {}
-    raw_accounts = data.get("accounts", {}) or {}
-    if not isinstance(raw_accounts, dict):
-        raise ValueError("Invalid configuration format")
-
-    for name, s in raw_accounts.items():
-        accounts[name] = AccountConfig(
-            api_token=s["api_token"],
-            account_id=s["account_id"],
-            sandbox_mode=bool(s.get("sandbox_mode", False)),
-        )
-
-    return AppConfig(server=server_config, telegram=telegram_config, accounts=accounts)
+    return AppConfig(**data)

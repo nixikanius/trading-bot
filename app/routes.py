@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import atexit
-import uuid
 from http import HTTPStatus
 from flask import Blueprint, jsonify, request
 

@@ -10,11 +10,12 @@ telegram:
 # Trading accounts
 accounts:
   account-a:
-    api_token: tinkoff_token_1
-    account_id: account_id_1
-    # true for sandbox, false for real trading
-    sandbox_mode: true
+    broker: finam
+    context:
+      token: finam_token_1
+      account_id: account_id_1
   account-b:
-    api_token: tinkoff_token_2
-    account_id: account_id_2
-    sandbox_mode: false
+    broker: finam
+    context:
+      token: finam_token_2
+      account_id: account_id_2

@@ -46,7 +46,7 @@ if __name__ == "__main__":
         app.run(
             host="127.0.0.1",
             port=8000,
-            debug=(config.server.log_level.upper() == "DEBUG")
+            debug=True
         )
     except KeyboardInterrupt:
         logger.info("Server stopped by user")

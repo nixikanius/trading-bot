@@ -113,6 +113,6 @@ class TelegramService:
                     price = order.price
                 
                 action = f"⬆️ {order.direction.upper()}" if order.direction == 'buy' else f"⬇️ {order.direction.upper()}"
-                message += f"{order_type}: {action} {order.quantity} lots @ <b>{price}</b> ({order.exchange_order_type})\n"
+                message += f"{order_type}: {action} {order.quantity} lots @ <b>{price}</b> ({order.exchange_order_type[0].upper()})\n"
         
         return message

@@ -31,7 +31,6 @@ class PositionInfo:
 class EnsurePositionOrderState:
     date: datetime
     price: float
-    commission: float
 
 @dataclass
 class EnsurePositionOrder:
@@ -492,12 +491,10 @@ class TInvestService:
             
             order_date = order_state.order_date
             order_price = float(order_state.average_position_price.units + order_state.average_position_price.nano / 1e9)
-            commission = float(order_state.executed_commission.units + order_state.executed_commission.nano / 1e9)
             
             return EnsurePositionOrderState(
                 date=order_date,
-                price=order_price,
-                commission=commission
+                price=order_price
             )
 
     # def get_ensure_order_state_waiting_for_price(self, order_id: str, price_type: PriceType = PriceType.PRICE_TYPE_UNSPECIFIED, max_attempts: int = 10, delay_ms: int = 500) -> EnsurePositionOrderState:

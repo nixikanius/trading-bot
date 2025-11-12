@@ -71,7 +71,7 @@ class TelegramService:
             for order in ensure_orders:
                 if order.type in ['buy', 'sell']:
                     order_emoji = "⬆️" if order.type == 'buy' else "⬇️"
-                    order_message = f"{order_emoji} {order.type.upper()} {order.quantity} lots @ {order.state.price} ({order.action}), com. {order.state.commission}"
+                    order_message = f"{order_emoji} {order.type.upper()} {order.quantity} lots @ {order.state.price} ({order.action})"
 
                     order_slippage = result['slippage'].get(order.order_id, {})
                     

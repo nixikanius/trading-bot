@@ -151,7 +151,7 @@ class SignalQueue:
         processing_duration_s = (queued_signal.processing_end_time - queued_signal.processing_start_time).total_seconds()
         total_duration_s = (queued_signal.processing_end_time - queued_signal.enqueue_time).total_seconds()
 
-        logger.info(f"Timing info: queue={queue_duration_s:.3f}s, processing={processing_duration_s:.3f}s, total={total_duration_s:.3f}s")
+        logger.info(f"Processing time: queue={queue_duration_s:.3f}s, processing={processing_duration_s:.3f}s, total={total_duration_s:.3f}s")
     
     def _send_error_notification(self, queued_signal: QueuedSignal, error: str, details: str):
         """Send error notification to Telegram"""

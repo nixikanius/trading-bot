@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 from app.config import AccountConfig
 from app.logger import get_logger
 from app.schemas import Signal
@@ -129,9 +131,9 @@ class SignalService:
                     order_price = ensure_order.state.price
                     # slippage > 0: losing money, slippage < 0: making money
                     if ensure_order.action in ["open_short", "close_long"]:
-                        price_slippage = signal.entry_price - order_price
+                        price_slippage = float(Decimal(str(signal.entry_price)) - Decimal(str(order_price)))
                     else:
-                        price_slippage = order_price - signal.entry_price
+                        price_slippage = float(Decimal(str(order_price)) - Decimal(str(signal.entry_price)))
                     
                 time_slippage = None
                 if signal.entry_time:
@@ -152,10 +154,10 @@ class SignalService:
         # Action filter and profit multiplier based on position
         if position.quantity > 0:
             action_filter = "close_long"
-            profit_multiplier = 1   # (ensure_order.state.price - position.average_price)
+            profit_multiplier = 1   # (result_price - position_price)
         else:
             action_filter = "close_short"
-            profit_multiplier = -1  # (position.average_price - ensure_order.state.price)
+            profit_multiplier = -1  # (position_price - result_price)
 
         profit = 0.0
         profit_orders = [eo for eo in ensure_orders if eo.action == action_filter]

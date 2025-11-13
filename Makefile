@@ -7,18 +7,20 @@ VERSION=latest
 # Default target
 help:
 	@echo "Available targets:"
-	@echo "  install      - Install dependencies"
-	@echo "  run          - Run the app"
-	@echo "  run-gunicorn - Run with Gunicorn in development mode"
-	@echo "  test         - Run tests"
-	@echo "  clean        - Clean up temporary files and dependencies"
-	@echo "  docker-build - Build Docker image"
-	@echo "  docker-run   - Run Docker container"
+	@echo "  install            - Install dependencies"
+	@echo "  run                - Run the app"
+	@echo "  run-gunicorn       - Run with Gunicorn in development mode"
+	@echo "  test               - Run tests"
+	@echo "  clean              - Clean up temporary files and dependencies"
+	@echo "  docker-build       - Build Docker image"
+	@echo "  docker-build-local - Build local Docker image"
+	@echo "  docker-run         - Run Docker container"
 
 install:
 	python3 -m venv .venv
 	.venv/bin/pip install --upgrade pip
 	.venv/bin/pip install -r requirements.txt
+	.venv/bin/pip install -r requirements-nodeps.txt --no-deps
 
 run:
 	.venv/bin/python run.py
@@ -42,6 +44,10 @@ clean:
 docker-build:
 	@echo "Building docker image $(DOCKER_IMAGE) for version $(VERSION) (platforms $(DOCKER_PLATFORMS))..."
 	docker buildx build --platform $(DOCKER_PLATFORMS) -t $(DOCKER_IMAGE):$(VERSION) .
+
+docker-build-local:
+	@echo "Building local docker image $(DOCKER_IMAGE) for version $(VERSION)..."
+	docker build -t $(DOCKER_IMAGE):$(VERSION) .
 
 docker-push:	
 	@echo "Pushing docker image $(DOCKER_IMAGE) for version $(VERSION) (platforms $(DOCKER_PLATFORMS))..."

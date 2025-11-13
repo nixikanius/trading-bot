@@ -25,7 +25,6 @@ PyYAML==6.0.3
 requests==2.31.0
 six==1.17.0
 tinkoff==0.1.1
-tinkoff-investments==0.2.0b116
 types-protobuf==6.32.1.20250918
 typing-inspection==0.4.2
 typing_extensions==4.15.0

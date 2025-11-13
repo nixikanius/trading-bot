@@ -13,12 +13,11 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
-COPY requirements.txt requirements-nodeps.txt .
+COPY requirements.txt .
 
-# Install Python dependencies
+# Install Python dependencies (no-deps flag is important to avoid version conflicts)
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir -r requirements-nodeps.txt --no-deps
+    pip install --no-cache-dir -r requirements.txt --no-deps
 
 # Copy application code
 COPY . .

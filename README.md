@@ -1,10 +1,11 @@
 # Trading Bot
 
-Bot service for automated trading through T-Investments (formerly Tinkoff Investments) API based on trading signals (e.g. from TradingView).
+Bot service for automated trading through exchange brokers API based on trading signals (e.g. from TradingView).
 
 ## Features
 
-- **Multiple Account Support** - Handle multiple trading accounts with individual configurations
+- **Multiple Broker Support** - Handle multiple brokers (T-Investments and Finam)
+- **Multiple Account Support** - Handle multiple trading accounts with individual broker configuration
 - **Automatic Position Reconciliation** - Smart position management to match signal state
 - **Position Size Calculation** - Dynamic sizing based on available capital and leverage
 - **Stop-Loss & Take-Profit** - Automatic order placement with price validation

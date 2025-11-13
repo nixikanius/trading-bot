@@ -27,7 +27,7 @@ class SignalService:
         instrument_info = self.broker.get_instrument_info(signal.instrument)
         logger.info(f"Instrument info: {instrument_info}")
         
-        init_position = self.broker.get_position(signal.instrument)
+        init_position = self.broker.get_position(instrument_info)
         logger.info(f"Initial position: {init_position}")
         
         # Handle signal based on position
@@ -36,10 +36,10 @@ class SignalService:
         else:
             position, ensure_orders = self._handle_position_signal(signal, instrument_info, init_position)
         
-        ensure_orders = self.broker.pull_ensure_orders_result(ensure_orders)
+        ensure_orders = self.broker.pull_ensure_orders_result(ensure_orders, instrument_info)
         slippage = self._calculate_slippage(signal, ensure_orders)
         profit = self._calculate_profit(instrument_info, init_position, ensure_orders)
-        stop_orders = self.broker.get_current_stop_orders(signal.instrument)
+        stop_orders = self.broker.get_current_stop_orders(instrument_info)
 
         logger.info(f"Ensure orders: {ensure_orders}")
         logger.info(f"Slippage: {slippage}")

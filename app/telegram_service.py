@@ -50,7 +50,7 @@ class TelegramService:
 
         message = f"🛎️ <b>Trading Signal</b>\n\n"
         message += f"<i>{account}</i>\n"
-        message += f"{signal['instrument']['ticker']}@{signal['instrument']['class_code']}: {position_emoji} <b>{signal['position'].upper()}</b>\n"
+        message += f"{signal['instrument']}: {position_emoji} <b>{signal['position'].upper()}</b>\n"
 
         # Signal entry data
         signal_entry_data = []

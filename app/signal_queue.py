@@ -12,7 +12,6 @@ from app.config import AccountConfig, TelegramConfig
 from app.signal_service import SignalService
 from app.brokers import TradingError
 from app.telegram_service import TelegramService
-from tinkoff.invest.exceptions import RequestError
 
 logger = get_logger(__name__)
 
@@ -130,14 +129,6 @@ class SignalQueue:
             result = signal_service.process_signal(queued_signal.signal)
 
             logger.info(f"Processed signal for {queued_signal.key}: {result}")
-        except RequestError as e:
-            # Handle Tinkoff trading errors
-            code = e.code.name if e.code else "UNKNOWN"
-            message = getattr(e.metadata, "message", None) if e.metadata else None
-            message = message or e.details or "Trading request error"
-            
-            logger.error(f"Trading request error for {queued_signal.key}: {code} - {message}", exc_info=True)
-            self._send_error_notification(queued_signal, f"Trading Request Error: {code}", message)
         except TradingError as e:
             # Handle custom trading errors
             logger.error(f"Trading error for {queued_signal.key}: {e.code} - {e}", exc_info=True)            

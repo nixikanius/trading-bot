@@ -10,12 +10,15 @@ telegram:
 # Trading accounts
 accounts:
   account-a:
-    broker: finam
-    context:
-      token: finam_token_1
-      account_id: account_id_1
+    broker:
+      name: tinvest
+      config:
+        token: tinvest_token
+        account_id: tinvest_account_id
+        sandbox_mode: true
   account-b:
-    broker: finam
-    context:
-      token: finam_token_2
-      account_id: account_id_2
+    broker:
+      name: finam
+      config:
+        token: finam_token
+        account_id: finam_account_id

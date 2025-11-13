@@ -6,7 +6,9 @@ from datetime import datetime
 from typing import Optional
 
 from app.config import AccountConfig
-from app.schemas import Instrument
+from app.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class TradingError(Exception):
@@ -18,18 +20,18 @@ class TradingError(Exception):
 
 @dataclass
 class InstrumentInfo:
-    instrument: Instrument
+    instrument: str
     name: str
     type: str
     currency: str
     lot_size: float
     min_price_step: float
-    initial_margin_long: float
-    initial_margin_short: float
+    initial_margin_long: float = None
+    initial_margin_short: float = None
 
 @dataclass
 class Position:
-    instrument: Instrument
+    instrument: str
     quantity: int
     average_price: float
 
@@ -62,28 +64,18 @@ class BrokerService(ABC):
     """Base class for broker service implementations"""
     
     @abstractmethod
-    def get_instrument_info(self, instrument: Instrument) -> Optional[InstrumentInfo]:
+    def get_instrument_info(self, instrument: str) -> Optional[InstrumentInfo]:
         """Get instrument details"""
         pass
     
     @abstractmethod
-    def get_position(self, instrument: Instrument) -> Optional[Position]:
+    def get_position(self, instrument_info: InstrumentInfo) -> Optional[Position]:
         """Get current position for instrument from portfolio"""
         pass
     
     @abstractmethod
-    def get_position_waiting_for_state(self, instrument: Instrument, expected_quantity: int, max_attempts: int = 20, delay: float = 0.250) -> Optional[Position]:
+    def get_position_waiting_for_state(self, instrument_info: InstrumentInfo, expected_quantity: int, max_attempts: int = 20, delay: float = 0.250) -> Optional[Position]:
         """Get current position for instrument from portfolio waiting for expected state"""
-        pass
-    
-    @abstractmethod
-    def get_money_balance(self) -> float:
-        """Get available money balance in specified currency"""
-        pass
-    
-    @abstractmethod
-    def get_last_price(self, instrument: Instrument) -> float:
-        """Get last price for instrument"""
         pass
     
     @abstractmethod
@@ -107,25 +99,22 @@ class BrokerService(ABC):
         pass
     
     @abstractmethod
-    def cancel_orders(self, orders: list[StopOrder]) -> None:
-        """Cancel orders"""
+    def cancel_stop_orders(self, orders: list[StopOrder]) -> None:
+        """Cancel stop orders"""
         pass
     
     @abstractmethod
-    def get_current_stop_orders(self, instrument: Instrument) -> list[StopOrder]:
+    def get_current_stop_orders(self, instrument_info: InstrumentInfo) -> list[StopOrder]:
         """Get current active stop orders for instrument"""
         pass
     
     @abstractmethod
-    def pull_ensure_orders_result(self, ensure_orders: list[EnsureOrder]) -> list[EnsureOrder]:
+    def pull_ensure_orders_result(self, ensure_orders: list[EnsureOrder], instrument_info: InstrumentInfo) -> list[EnsureOrder]:
         """Pull execution results for ensure orders"""
         pass
     
     def _should_update_stop_orders(self, stop_orders: list[StopOrder], stop_price: Optional[float], take_price: Optional[float]) -> bool:
         """Check if stop orders need to be updated based on stop price changes"""
-        from app.logger import get_logger
-        logger = get_logger(__name__)
-        
         current_stop_price = None
         current_take_price = None
         
@@ -150,12 +139,9 @@ class BrokerService(ABC):
         return False
     
     def ensure_position(self, instrument_info: InstrumentInfo, init_position: Optional[Position], desired_position: str, leverage_percent: float, reserve_capital: float, stop_price: Optional[float] = None, take_price: Optional[float] = None) -> tuple[Optional[Position], list[EnsureOrder]]:
-        """Ensure position matches desired state. Common logic for all exchanges."""
-        from app.logger import get_logger
-        logger = get_logger(__name__)
-        
+        """Ensure position matches desired state. Common logic for all brokers."""
         init_pos_qty = init_position.quantity if init_position else 0
-        init_stop_orders = self.get_current_stop_orders(instrument_info.instrument)
+        init_stop_orders = self.get_current_stop_orders(instrument_info)
         logger.info(f"Init position quantity: {init_pos_qty}, desired position: {desired_position}, init stop orders: {init_stop_orders}")
         
         expected_pos_qty = init_pos_qty
@@ -166,7 +152,7 @@ class BrokerService(ABC):
                 if init_pos_qty < 0:
                     logger.info(f"Closing short position of {init_pos_qty} lots...")
 
-                    self.cancel_orders(init_stop_orders)
+                    self.cancel_stop_orders(init_stop_orders)
                     order_id = self.place_market_order(instrument_info, 'buy', -init_pos_qty)
                     orders.append(EnsureOrder(type="buy", quantity=-init_pos_qty, order_id=order_id, action="close_short"))
                 
@@ -187,7 +173,7 @@ class BrokerService(ABC):
                 if init_pos_qty > 0:
                     logger.info(f"Closing long position of {init_pos_qty} lots...")
 
-                    self.cancel_orders(init_stop_orders)
+                    self.cancel_stop_orders(init_stop_orders)
                     order_id = self.place_market_order(instrument_info, 'sell', init_pos_qty)
                     orders.append(EnsureOrder(type="sell", quantity=init_pos_qty, order_id=order_id, action="close_long"))
                 
@@ -219,16 +205,16 @@ class BrokerService(ABC):
             else:
                 logger.info(f"Position already flat")
 
-        final_position = self.get_position_waiting_for_state(instrument_info.instrument, expected_pos_qty)
+        final_position = self.get_position_waiting_for_state(instrument_info, expected_pos_qty)
         final_pos_qty = final_position.quantity if final_position else 0
-        final_stop_orders = self.get_current_stop_orders(instrument_info.instrument)
+        final_stop_orders = self.get_current_stop_orders(instrument_info)
 
         logger.info(f"Final position quantity: {final_pos_qty}")
 
         if final_pos_qty != init_pos_qty or self._should_update_stop_orders(final_stop_orders, stop_price, take_price):
             logger.info(f"Updating stop orders...")
 
-            self.cancel_orders(final_stop_orders)
+            self.cancel_stop_orders(final_stop_orders)
             
             # Long position
             if final_pos_qty > 0:
@@ -257,13 +243,16 @@ class BrokerService(ABC):
 
 # Avoid circular import
 from app.brokers.finam import create_finam_service
+from app.brokers.tinvest import create_tinvest_service
 
 def create_broker_service(account_config: AccountConfig) -> BrokerService:
     """Create broker service based on account broker configuration"""
-    broker = account_config.broker
-    context = account_config.context
+    name = account_config.broker.name
+    config = account_config.broker.config
     
-    if broker == "finam":
-        return create_finam_service(context)
+    if name == "finam":
+        return create_finam_service(config)
+    elif name == "tinvest":
+        return create_tinvest_service(config)
     else:
-        raise ValueError(f"Unsupported broker: {broker}")
+        raise ValueError(f"Unsupported broker: {name}")

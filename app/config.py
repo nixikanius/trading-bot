@@ -7,9 +7,12 @@ import yaml
 from pydantic import BaseModel, Field, ValidationError, model_validator
 
 
+class BrokerConfig(BaseModel):
+    name: str
+    config: dict[str, Any]
+
 class AccountConfig(BaseModel):
-    broker: str
-    context: dict[str, Any]
+    broker: BrokerConfig
 
 class ServerConfig(BaseModel):
     log_level: str = "INFO"

@@ -54,9 +54,13 @@ class TelegramService:
 
         # Signal entry data
         signal_entry_data = []
-        for key in ['entry_price', 'entry_time']:
-            if (value := signal.get(key)) is not None:
-                signal_entry_data.append(str(value))
+        if value := signal.get('entry_price'):
+            signal_entry_data.append(str(value))
+        if value := signal.get('entry_time'):
+            delay = signal['timestamp'] - value
+            entry_time = f"{value} (+ {format_duration(delay)})"
+            signal_entry_data.append(entry_time)
+        
         if signal_entry_data:
             message += f"▶️ {' @ '.join(signal_entry_data)}\n"
         

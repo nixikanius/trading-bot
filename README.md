@@ -122,7 +122,7 @@ Each signal can include the following parameters:
 - `limit_price` - take-profit price (optional)
 - `reserve_capital` - additional sum of money added to available funds for position size calculation (in instrument currency, default: 0)
 - `capital_leverage_percent` - capital percentage used for position size calculation (default: 100)
-- `figi` - instrument FIGI code (12 characters)
+- `instrument` - instrument code (FIGI for T-Investments, symbol for Finam)
 
 ### Long Position
 
@@ -136,7 +136,7 @@ Each signal can include the following parameters:
   "limit_price": 320,
   "reserve_capital": 0,
   "capital_leverage_percent": 100,
-  "figi": "BBG004730N88"
+  "instrument": "BBG004730N88"
 }
 ```
 
@@ -152,7 +152,7 @@ Each signal can include the following parameters:
   "limit_price": 2600,
   "reserve_capital": 6000000,
   "capital_leverage_percent": 250,
-  "figi": "FUTIMOEXF000"
+  "instrument": "IMOEXF@RTSX"
 }
 ```
 

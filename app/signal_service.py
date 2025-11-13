@@ -143,14 +143,14 @@ class SignalService:
             action_filter = "close_short"
             profit_multiplier = -1  # (position_price - result_price)
 
-        profit = 0.0
+        profit = Decimal(0)
         profit_orders = [eo for eo in ensure_orders if eo.action == action_filter]
 
         if not profit_orders:
             return None
 
         for ensure_order in profit_orders:
-            qty = ensure_order.quantity * instrument_info.lot_size
-            profit += profit_multiplier * (ensure_order.result.price - position.average_price) * qty
+            qty = ensure_order.quantity * Decimal(str(instrument_info.lot_size))
+            profit += profit_multiplier * (Decimal(str(ensure_order.result.price)) - Decimal(str(position.average_price))) * qty
         
-        return profit
+        return float(profit)

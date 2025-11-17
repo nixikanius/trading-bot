@@ -18,7 +18,7 @@ class Signal(BaseModel):
     limit_price: Optional[float] = None
     reserve_capital: float = Field(default=0)
     capital_leverage_percent: float = Field(default=100)
-    instrument: str = Field()
+    instrument: str = Field(min_length=1)
     
     @field_validator('entry_time', mode='after')
     @classmethod

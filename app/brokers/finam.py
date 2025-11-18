@@ -242,14 +242,29 @@ class FinamBrokerService(BrokerService):
         return current_orders
     
     def pull_ensure_orders_result(self, ensure_orders: list[EnsureOrder], _: InstrumentInfo) -> list[EnsureOrder]:
-        trades = self.get_trades()
+        order_ids = [order.order_id for order in ensure_orders if order.type in ["buy", "sell"]]
+        trades = self.get_trades_waiting_for_orders(order_ids)
 
-        for ensure_order in ensure_orders:
-            if ensure_order.type in ["buy", "sell"]:
-                order_result = self.get_order_result(ensure_order.order_id, trades)
-                ensure_order.result = order_result
+        for order in ensure_orders:
+            if order.order_id in order_ids:
+                order.result = self.get_order_result(order.order_id, trades)
 
         return ensure_orders
+    
+    def get_trades_waiting_for_orders(self, order_ids: list[str], max_attempts: int = 20, delay: float = 0.250) -> list[TradesResponse]:
+        for attempt in range(max_attempts):
+            trades = self.get_trades()
+            # Return trades, if they are ready
+            if all(trade.order_id in order_ids for trade in trades):
+                return trades
+
+            logger.info(f"Waiting for trades readiness (attempt {attempt + 1}/{max_attempts}) for orders {order_ids}")
+            time.sleep(delay)
+        
+        raise TradingError(
+            code="TRADES_READINESS_TIMEOUT",
+            message=f"Trades readiness timeout after {max_attempts} attempts for orders {order_ids}"
+        )
 
     def get_order_result(self, order_id: str, trades: list[TradesResponse]) -> OrderResult:
         for trade in trades:

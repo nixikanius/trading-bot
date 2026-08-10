@@ -116,7 +116,9 @@ class FinamBrokerService(BrokerService):
         account = self.call_function(
             self._client.accounts_stub.GetAccount, GetAccountRequest(account_id=self.config.account_id))
         
-        balance = float(account.portfolio_mc.available_cash.value)
+        # balance = float(account.portfolio_mc.available_cash.value)
+        # ugly way, but using available_cash sum is frequently delayed on changing position from short to long or vice versa
+        balance = float(account.equity.value)
         return balance
     
     def get_last_price(self, instrument: str) -> float:

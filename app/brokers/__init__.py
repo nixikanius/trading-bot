@@ -117,6 +117,7 @@ class BrokerService(ABC):
         """Check if stop orders need to be updated based on stop price changes"""
         current_stop_price = None
         current_take_price = None
+        current_take_limit_price = None
         
         for stop_order in stop_orders:
             if stop_order.order_type == 'stop_loss':
@@ -131,8 +132,9 @@ class BrokerService(ABC):
                     return True
                 
                 current_take_price = stop_order.stop_price
+                current_take_limit_price = stop_order.price
             
-        if stop_price != current_stop_price or take_price != current_take_price:
+        if stop_price != current_stop_price or take_price != current_take_price or take_price != current_take_limit_price:
             logger.info(f"Stop orders need to be updated: current_stop_price={current_stop_price}, desired_stop_price={stop_price}, current_take_price={current_take_price}, desired_take_price={take_price}")
             return True
             

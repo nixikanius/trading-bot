@@ -216,7 +216,8 @@ class FinamBrokerService(BrokerService):
                 symbol=str(instrument_info.instrument),
                 quantity=Decimal(value=str(quantity)),
                 side=SIDE_SELL if direction == "sell" else SIDE_BUY,
-                type=ORDER_TYPE_STOP,
+                type=ORDER_TYPE_STOP_LIMIT,
+                limit_price=Decimal(value=str(take_price)),
                 stop_price=Decimal(value=str(take_price)),
                 stop_condition=STOP_CONDITION_LAST_UP if direction == "sell" else STOP_CONDITION_LAST_DOWN,
                 valid_before=VALID_BEFORE_GOOD_TILL_CANCEL,
@@ -254,7 +255,7 @@ class FinamBrokerService(BrokerService):
                     quantity=int(float(order.order.quantity.value)),
                     price=float(order.order.limit_price.value) if order.order.type == ORDER_TYPE_STOP_LIMIT else None,
                     stop_price=float(order.order.stop_price.value),
-                    exchange_order_type="market" if hasattr(order.order, 'limit_price') else "limit"
+                    exchange_order_type="limit" if order.order.type == ORDER_TYPE_STOP_LIMIT else "market"
                 ))
             
         return current_orders

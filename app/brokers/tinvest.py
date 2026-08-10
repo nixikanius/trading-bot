@@ -257,12 +257,13 @@ class TInvestBrokerService(BrokerService):
             response = client.stop_orders.post_stop_order(
                 figi=instrument_info.instrument,
                 quantity=quantity,
+                price=Quotation(units=int(take_price), nano=int((take_price - int(take_price)) * 1e9)),
                 stop_price=Quotation(units=int(take_price), nano=int((take_price - int(take_price)) * 1e9)),
                 direction=order_direction,
                 account_id=self.config.account_id,
                 stop_order_type=StopOrderType.STOP_ORDER_TYPE_TAKE_PROFIT,
                 expiration_type=StopOrderExpirationType.STOP_ORDER_EXPIRATION_TYPE_GOOD_TILL_CANCEL,
-                exchange_order_type=ExchangeOrderType.EXCHANGE_ORDER_TYPE_MARKET,
+                exchange_order_type=ExchangeOrderType.EXCHANGE_ORDER_TYPE_LIMIT,
             )
         
         logger.info(f"Placed take profit order for {quantity} lots of {instrument_info.instrument} at {take_price}, order_id: {response.stop_order_id}")

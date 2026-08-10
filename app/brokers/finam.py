@@ -295,7 +295,12 @@ class FinamBrokerService(BrokerService):
         
         raise TradingError(code="ORDER_TRADE_NOT_FOUND", message=f"Order {order_id} not found in trades")
     
-    def get_trades(self, start_date: datetime = datetime.now() - timedelta(hours=1), end_date: datetime = datetime.now() + timedelta(hours=1)) -> list[TradesResponse]:
+    def get_trades(self, start_date: Optional[datetime] = None, end_date: Optional[datetime] = None) -> list[TradesResponse]:
+        if start_date is None:
+            start_date = datetime.now() - timedelta(hours=1)
+        if end_date is None:
+            end_date = datetime.now() + timedelta(hours=1)
+
         trades = self.call_function(
             self._client.accounts_stub.Trades, TradesRequest(
                 account_id=self.config.account_id,

@@ -261,39 +261,50 @@ class FinamBrokerService(BrokerService):
         return current_orders
     
     def pull_ensure_orders_result(self, ensure_orders: list[EnsureOrder], _: InstrumentInfo) -> list[EnsureOrder]:
-        order_ids = [order.order_id for order in ensure_orders if order.type in ["buy", "sell"]]
-        trades = self.get_trades_waiting_for_orders(order_ids)
+        logger.info(f"Pulling ensure orders result for orders: {ensure_orders}")
+        orders = [order for order in ensure_orders if order.type in ["buy", "sell"]]
+        logger.info(f"Waiting for trades readiness for orders: {orders}")
+        trades = self.get_trades_waiting_for_orders(orders)
 
         for order in ensure_orders:
-            if order.order_id in order_ids:
-                order.result = self.get_order_result(order.order_id, trades)
+            if order in orders:
+                logger.info(f"Getting order result for order {order.order_id}")
+                order.result = self.get_order_result(order, trades)
 
         return ensure_orders
     
-    def get_trades_waiting_for_orders(self, order_ids: list[str], max_attempts: int = 20, delay: float = 0.250) -> list[TradesResponse]:
+    def get_trades_waiting_for_orders(self, orders: list[EnsureOrder], max_attempts: int = 20, delay: float = 0.250) -> list[TradesResponse]:
         for attempt in range(max_attempts):
             trades = self.get_trades()
-            # Return trades, if they are ready
-            if all(trade.order_id in order_ids for trade in trades):
-                return trades
 
-            logger.info(f"Waiting for trades readiness (attempt {attempt + 1}/{max_attempts}) for orders {order_ids}")
+            trades_ready = True
+            for order in orders:
+                trade_qty = sum([int(float(trade.size.value)) for trade in trades if trade.order_id == order.order_id])
+                if trade_qty != order.quantity:
+                    logger.info(f"Trades quantity {trade_qty} for order {order.order_id} does not match expected quantity {order.quantity}")
+                    trades_ready = False
+                    break
+
+            if trades_ready:
+                return trades
+            
+            logger.info(f"Waiting for trades readiness (attempt {attempt + 1}/{max_attempts})")
             time.sleep(delay)
         
         raise TradingError(
             code="TRADES_READINESS_TIMEOUT",
-            message=f"Trades readiness timeout after {max_attempts} attempts for orders {order_ids}"
+            message=f"Trades readiness timeout after {max_attempts} attempts"
         )
 
-    def get_order_result(self, order_id: str, trades: list[TradesResponse]) -> OrderResult:
-        for trade in trades:
-            if trade.order_id == order_id:
-                return OrderResult(
-                    date=datetime.fromtimestamp(trade.timestamp.seconds + trade.timestamp.nanos/1e9, tz=timezone.utc),
-                    price=float(trade.price.value)
-                )
+    def get_order_result(self, order: EnsureOrder, trades: list[TradesResponse]) -> OrderResult:
+        order_trades = [trade for trade in trades if trade.order_id == order.order_id]
+        order_date = max([datetime.fromtimestamp(trade.timestamp.seconds + trade.timestamp.nanos/1e9, tz=timezone.utc) for trade in order_trades])
+        order_price = sum([float(trade.price.value) * int(float(trade.size.value)) for trade in order_trades]) / order.quantity
         
-        raise TradingError(code="ORDER_TRADE_NOT_FOUND", message=f"Order {order_id} not found in trades")
+        return OrderResult(
+            date=order_date,
+            price=order_price
+        )
     
     def get_trades(self, start_date: Optional[datetime] = None, end_date: Optional[datetime] = None) -> list[TradesResponse]:
         if start_date is None:

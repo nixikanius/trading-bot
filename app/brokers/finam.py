@@ -54,7 +54,23 @@ class FinamBrokerService(BrokerService):
             raise TradingError(code="FINAM_REQUEST_ERROR",
                                 message=f"Finam request error: {details}")
 
-    def get_instrument_info(self, instrument: str) -> Optional[InstrumentInfo]:
+    def get_instrument_info(self, instrument: str, max_attempts: int = 20, delay: float = 0.250) -> Optional[InstrumentInfo]:
+        """Get instrument details waiting for them to be ready"""
+
+        for attempt in range(max_attempts):
+            instrument_info = self._get_instrument_info(instrument)
+            if instrument_info.initial_margin_long != 0 and instrument_info.initial_margin_short != 0:
+                return instrument_info
+
+            logger.info(f"Waiting for instrument info ready (attempt {attempt + 1}/{max_attempts}) for instrument {instrument}")
+            time.sleep(delay)
+        
+        raise TradingError(
+            code="INSTRUMENT_INFO_READY_TIMEOUT",
+            message=f"Instrument info ready timeout after {max_attempts} attempts for instrument {instrument}"
+        )
+    
+    def _get_instrument_info(self, instrument: str) -> InstrumentInfo:
         """Get instrument details"""
         asset = self.call_function(
             self._client.assets_stub.GetAsset, GetAssetRequest(symbol=instrument, account_id=self.config.account_id))

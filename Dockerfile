@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.14.6-slim
 
 WORKDIR /app
 
@@ -15,9 +15,9 @@ RUN apt-get update && apt-get install -y \
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install Python dependencies (no-deps flag is important to avoid version conflicts)
+# Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt --no-deps
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . .

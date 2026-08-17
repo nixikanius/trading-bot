@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 import time
+from decimal import Decimal
 from typing import Optional, Any
 from contextlib import contextmanager
+from uuid import uuid4
 from pydantic import BaseModel
 
 from app.logger import get_logger
 from app.brokers import BrokerService, TradingError, InstrumentInfo, Position, OrderResult, EnsureOrder, StopOrder
-from tinkoff.invest import Client, OrderDirection, OrderType, Quotation, StopOrderDirection, StopOrderType, StopOrderExpirationType, ExchangeOrderType, PriceType
-from tinkoff.invest.constants import INVEST_GRPC_API, INVEST_GRPC_API_SANDBOX
-from tinkoff.invest.schemas import GetMaxLotsRequest, InstrumentIdType
-from tinkoff.invest.exceptions import RequestError
+from t_tech.invest import Client, OrderDirection, OrderType, StopOrderDirection, StopOrderType, StopOrderExpirationType, ExchangeOrderType, PriceType
+from t_tech.invest.constants import INVEST_GRPC_API, INVEST_GRPC_API_SANDBOX
+from t_tech.invest.schemas import GetMaxLotsRequest, InstrumentIdType
+from t_tech.invest.exceptions import RequestError
+from t_tech.invest.utils import decimal_to_quotation
 
 logger = get_logger(__name__)
 
@@ -74,8 +77,8 @@ class TInvestBrokerService(BrokerService):
                 instrument_response = client.instruments.currency_by(id_type=InstrumentIdType.INSTRUMENT_ID_TYPE_FIGI, id=instrument)
             elif instrument_type == "options":
                 instrument_response = client.instruments.option_by(id_type=InstrumentIdType.INSTRUMENT_ID_TYPE_FIGI, id=instrument)
-            elif instrument_type == "structured_products":
-                instrument_response = client.instruments.structured_product_by(id_type=InstrumentIdType.INSTRUMENT_ID_TYPE_FIGI, id=instrument)
+            elif instrument_type in {"sp", "structured_note", "structured_notes"}:
+                instrument_response = client.instruments.structured_note_by(id_type=InstrumentIdType.INSTRUMENT_ID_TYPE_FIGI, id=instrument)
             else:
                 raise TradingError(
                     code="TINVEST_UNSUPPORTED_INSTRUMENT_TYPE",
@@ -148,7 +151,7 @@ class TInvestBrokerService(BrokerService):
     def get_last_price(self, instrument: str) -> float:
         """Get last price for instrument"""
         with self._client() as client:
-            last_prices_response = client.market_data.get_last_prices(figi=[instrument])
+            last_prices_response = client.market_data.get_last_prices(instrument_id=[instrument])
         
         if not last_prices_response.last_prices:
             raise TradingError(
@@ -218,13 +221,12 @@ class TInvestBrokerService(BrokerService):
         
         with self._client() as client:
             response = client.orders.post_order(
-                figi=instrument_info.instrument,
+                instrument_id=instrument_info.instrument,
                 quantity=quantity,
-                price=Quotation(units=0, nano=0),  # Market order
                 direction=order_direction,
                 account_id=self.config.account_id,
                 order_type=OrderType.ORDER_TYPE_MARKET,
-                order_id="",  # Let server generate
+                order_id=str(uuid4()),
             )
             
         logger.info(f"Placed market {direction} order for {quantity} lots of {instrument_info.instrument}, order_id: {response.order_id}")
@@ -236,9 +238,9 @@ class TInvestBrokerService(BrokerService):
 
         with self._client() as client:
             response = client.stop_orders.post_stop_order(
-                figi=instrument_info.instrument,
+                instrument_id=instrument_info.instrument,
                 quantity=quantity,
-                stop_price=Quotation(units=int(stop_price), nano=int((stop_price - int(stop_price)) * 1e9)),
+                stop_price=decimal_to_quotation(Decimal(str(stop_price))),
                 direction=order_direction,
                 account_id=self.config.account_id,
                 stop_order_type=StopOrderType.STOP_ORDER_TYPE_STOP_LOSS,
@@ -255,10 +257,10 @@ class TInvestBrokerService(BrokerService):
 
         with self._client() as client:
             response = client.stop_orders.post_stop_order(
-                figi=instrument_info.instrument,
+                instrument_id=instrument_info.instrument,
                 quantity=quantity,
-                price=Quotation(units=int(take_price), nano=int((take_price - int(take_price)) * 1e9)),
-                stop_price=Quotation(units=int(take_price), nano=int((take_price - int(take_price)) * 1e9)),
+                price=decimal_to_quotation(Decimal(str(take_price))),
+                stop_price=decimal_to_quotation(Decimal(str(take_price))),
                 direction=order_direction,
                 account_id=self.config.account_id,
                 stop_order_type=StopOrderType.STOP_ORDER_TYPE_TAKE_PROFIT,

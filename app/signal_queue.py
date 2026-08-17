@@ -33,6 +33,8 @@ class SignalQueue:
         self._processing: Dict[str, QueuedSignal] = {}  # key: f"{account}/{instrument}" -> currently processing signal
         self._waiting: Dict[str, QueuedSignal] = {}  # key: f"{account}/{instrument}" -> waiting signal
         self._lock = threading.Lock()
+        self._shutdown_lock = threading.Lock()
+        self._stopped = False
         self._executor = ThreadPoolExecutor(max_workers=10, thread_name_prefix="signal_worker")
 
         self._telegram_service = TelegramService(telegram_config)
@@ -177,5 +179,16 @@ class SignalQueue:
     
     def stop_processing(self):
         """Stop background processing"""
+        with self._shutdown_lock:
+            if self._stopped:
+                return
+            self._stopped = True
+
         self._executor.shutdown(wait=True)
-        logger.info("Stopped signal processing executor")
+        for account_name, signal_service in self._signal_services.items():
+            try:
+                signal_service.close()
+            except Exception:
+                logger.exception("Failed to close broker service for account %s", account_name)
+
+        logger.info("Stopped signal processing executor and closed broker services")

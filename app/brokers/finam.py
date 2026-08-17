@@ -10,10 +10,10 @@ from google.type.interval_pb2 import Interval
 from google.protobuf.timestamp_pb2 import Timestamp
 from pydantic import BaseModel
 from FinamPy import FinamPy
-from FinamPy.grpc.assets.assets_service_pb2 import GetAssetRequest, GetAssetParamsRequest
-from FinamPy.grpc.accounts.accounts_service_pb2 import GetAccountRequest, TradesRequest, TradesResponse
-from FinamPy.grpc.marketdata.marketdata_service_pb2 import QuoteRequest
-from FinamPy.grpc.orders.orders_service_pb2 import (
+from FinamPy.grpc.assets_service_pb2 import GetAssetRequest, GetAssetParamsRequest
+from FinamPy.grpc.accounts_service_pb2 import GetAccountRequest, TradesRequest, TradesResponse
+from FinamPy.grpc.marketdata_service_pb2 import QuoteRequest
+from FinamPy.grpc.orders_service_pb2 import (
     Order, OrdersRequest, CancelOrderRequest,
     ORDER_STATUS_WATCHING, ORDER_TYPE_MARKET, ORDER_TYPE_STOP, ORDER_TYPE_STOP_LIMIT,
     STOP_CONDITION_LAST_UP, STOP_CONDITION_LAST_DOWN, VALID_BEFORE_GOOD_TILL_CANCEL,
@@ -41,6 +41,10 @@ class FinamBrokerService(BrokerService):
     def __init__(self, config: FinamConfig) -> None:
         self.config = config
         self._client = FinamPy(self.config.token)
+
+    def close(self) -> None:
+        """Close the gRPC channel before interpreter shutdown."""
+        self._client.close_channel()
     
     def call_function(self, func, request):
         """Call FinamPy function (fork of _client.call_function with proper error handling)"""

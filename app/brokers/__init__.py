@@ -62,6 +62,10 @@ class StopOrder:
 
 class BrokerService(ABC):
     """Base class for broker service implementations"""
+
+    def close(self) -> None:
+        """Release resources owned by the broker client."""
+        pass
     
     @abstractmethod
     def get_instrument_info(self, instrument: str) -> Optional[InstrumentInfo]:

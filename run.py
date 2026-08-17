@@ -23,7 +23,7 @@ logging.basicConfig(
 
 # Configure external library logging to use our format with request_id
 setup_context_aware_logging('FinamPy', level=logging.WARNING)
-setup_context_aware_logging('tinkoff.invest.logging', level=logging.WARNING)
+setup_context_aware_logging('t_tech.invest.logging', level=logging.WARNING)
 
 app.register_blueprint(init_routes(CONFIG_PATH))
 
@@ -47,7 +47,8 @@ if __name__ == "__main__":
         app.run(
             host="127.0.0.1",
             port=8000,
-            debug=True
+            debug=True,
+            use_reloader=False,
         )
     except KeyboardInterrupt:
         logger.info("Server stopped by user")

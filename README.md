@@ -164,7 +164,7 @@ Each signal can include the following parameters:
   "bar_index": 10567,
   "entry_time": "2025-09-15T15:15:00",
   "entry_price": 270,
-  "figi": "BBG004730N88"
+  "instrument": "BBG004730N88"
 }
 ```
 

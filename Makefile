@@ -1,35 +1,25 @@
-.PHONY: help install run run-gunicorn test clean docker-build docker-run
+.PHONY: deps run run-gunicorn test clean docker-build docker-run help
 
 DOCKER_IMAGE=nixikanius/trading-bot
 DOCKER_PLATFORMS=linux/amd64,linux/arm64
 VERSION=latest
+PYTHON = pyenv exec python
+VENV ?= .venv
 
 # Default target
-help:
-	@echo "Available targets:"
-	@echo "  install            - Install dependencies"
-	@echo "  run                - Run the app"
-	@echo "  run-gunicorn       - Run with Gunicorn in development mode"
-	@echo "  test               - Run tests"
-	@echo "  clean              - Clean up temporary files and dependencies"
-	@echo "  docker-build       - Build Docker image"
-	@echo "  docker-build-local - Build local Docker image"
-	@echo "  docker-run         - Run Docker container"
-
-install:
-	python3 -m venv .venv
-	.venv/bin/pip install --upgrade pip
-	.venv/bin/pip install -r requirements.txt
-	.venv/bin/pip install -r requirements-nodeps.txt --no-deps
+deps:
+	$(PYTHON) -m venv $(VENV)
+	$(VENV)/bin/pip install --upgrade pip
+	$(VENV)/bin/pip install -r requirements.txt
 
 run:
-	.venv/bin/python run.py
+	$(VENV)/bin/python run.py
 
 run-gunicorn:
-	.venv/bin/gunicorn --reload run:app
+	$(VENV)/bin/gunicorn --reload run:app
 
 test:
-	.venv/bin/python -m pytest tests/ -v
+	$(VENV)/bin/python -m pytest tests/ -v
 
 clean:
 	rm -rf .venv
@@ -59,3 +49,16 @@ docker-run:
 		-p 8000:8000 \
 		-v $(PWD)/config.yml:/app/config.yml:ro \
 		$(DOCKER_IMAGE):$(VERSION)
+
+help:
+	@echo "Available targets:"
+	@echo "  deps               - Install dependencies"
+	@echo "  run                - Run the app"
+	@echo "  run-gunicorn       - Run with Gunicorn in development mode"
+	@echo "  test               - Run tests"
+	@echo "  clean              - Clean up temporary files and dependencies"
+	@echo "  docker-build       - Build Docker image"
+	@echo "  docker-build-local - Build local Docker image"
+	@echo "  docker-run         - Run Docker container"
+	@echo ""
+	@echo "Local Python version is defined in .python-version."

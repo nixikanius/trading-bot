@@ -20,6 +20,10 @@ class SignalService:
         self.broker: BrokerService = create_broker_service(account_config)
         self.telegram = telegram_service
 
+    def close(self) -> None:
+        """Release resources held by the broker service."""
+        self.broker.close()
+
     def process_signal(self, signal: Signal) -> dict:
         """Process trading signal and return result"""
         logger.info(f"Processing signal for {self.account_name}: {signal.model_dump()}")

@@ -4,7 +4,9 @@ WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app
+    PYTHONPATH=/app \
+    # Disable system keyring for FinamPy which tries to access it
+    PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
 
 # Install required system packages
 RUN apt-get update && apt-get install -y \

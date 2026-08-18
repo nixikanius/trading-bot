@@ -42,7 +42,7 @@ if __name__ == "__main__":
     logger.info("Starting Trading Bot server...")
     
     # This is only used for development with Flask dev server
-    # In production, use gunicorn: gunicorn -w 4 -b 0.0.0.0:8000 run:app
+    # In production, use gunicorn: gunicorn -w 1 -b 0.0.0.0:8000 run:app
     try:
         app.run(
             host="127.0.0.1",

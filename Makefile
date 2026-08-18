@@ -16,7 +16,7 @@ run:
 	$(VENV)/bin/python run.py
 
 run-gunicorn:
-	$(VENV)/bin/gunicorn --reload run:app
+	$(VENV)/bin/gunicorn --workers 1 --reload run:app
 
 test:
 	$(VENV)/bin/python -m pytest tests/ -v

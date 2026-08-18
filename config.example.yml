@@ -22,3 +22,5 @@ accounts:
       config:
         token: finam_token
         account_id: finam_account_id
+        request_timeout: 10
+        request_max_attempts: 10

@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Optional, Any
 from contextlib import contextmanager
 from uuid import uuid4
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.logger import get_logger
 from app.brokers import BrokerService, TradingError, InstrumentInfo, Position, OrderResult, EnsureOrder, StopOrder
@@ -19,8 +19,8 @@ logger = get_logger(__name__)
 
 
 class TInvestConfig(BaseModel):
-    token: str
-    account_id: str
+    token: str = Field(min_length=1)
+    account_id: str = Field(min_length=1)
     sandbox_mode: bool = False
 
 

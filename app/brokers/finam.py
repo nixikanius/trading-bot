@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import time
+import threading
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Any
-from grpc import RpcError
+from grpc import RpcError, StatusCode
 
 from google.type.decimal_pb2 import Decimal
 from google.type.interval_pb2 import Interval
 from google.protobuf.timestamp_pb2 import Timestamp
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from FinamPy import FinamPy
+from FinamPy.grpc.auth_service_pb2 import AuthRequest, TokenDetailsRequest
 from FinamPy.grpc.assets_service_pb2 import GetAssetRequest, GetAssetParamsRequest
 from FinamPy.grpc.accounts_service_pb2 import GetAccountRequest, TradesRequest, TradesResponse
 from FinamPy.grpc.marketdata_service_pb2 import QuoteRequest
@@ -25,10 +27,108 @@ from app.brokers import BrokerService, TradingError, InstrumentInfo, Position, O
 
 logger = get_logger(__name__)
 
+RETRY_DELAY_SECONDS = 0.250
+RETRYABLE_STATUS_CODES = {
+    StatusCode.ABORTED,
+    StatusCode.DEADLINE_EXCEEDED,
+    StatusCode.INTERNAL,
+    StatusCode.RESOURCE_EXHAUSTED,
+    StatusCode.UNAVAILABLE,
+}
+
 
 class FinamConfig(BaseModel):
-    token: str
-    account_id: str
+    token: str = Field(min_length=1)
+    account_id: str = Field(min_length=1)
+    request_timeout: float = Field(default=10.0, gt=0)
+    request_max_attempts: int = Field(default=10, ge=1)
+
+
+class FinamApiClient(FinamPy):
+    """FinamPy client with bounded RPC calls and safe JWT refresh."""
+
+    def __init__(self, access_token: str, request_timeout: float, request_max_attempts: int) -> None:
+        self.request_timeout = request_timeout
+        self.request_max_attempts = request_max_attempts
+        self._auth_lock = threading.RLock()
+        super().__init__(access_token)
+
+    @staticmethod
+    def _rpc_name(func) -> str:
+        method = getattr(func, "_method", b"unknown")
+        return method.decode("utf-8") if isinstance(method, bytes) else str(method)
+
+    def _call_rpc(self, func, request, *, metadata=None, max_attempts: int):
+        rpc_name = self._rpc_name(func)
+
+        for attempt in range(1, max_attempts + 1):
+            try:
+                response, _ = func.with_call(
+                    request=request,
+                    timeout=self.request_timeout,
+                    metadata=metadata,
+                )
+                return response
+            except RpcError as ex:
+                status_code = ex.code()
+                details = ex.details() or str(ex)
+                retryable = status_code in RETRYABLE_STATUS_CODES
+
+                if not retryable or attempt == max_attempts:
+                    raise TradingError(
+                        code="FINAM_REQUEST_ERROR",
+                        message=(
+                            f"Finam request {rpc_name} failed after {attempt} attempt(s): "
+                            f"{status_code.name}: {details}"
+                        ),
+                    ) from ex
+
+                logger.info(
+                    f"Finam request {rpc_name} failed with {status_code.name} "
+                    f"(attempt {attempt}/{max_attempts}): {details}. Retrying..."
+                )
+                time.sleep(RETRY_DELAY_SECONDS)
+
+        raise AssertionError("Finam RPC retry loop exited unexpectedly")
+
+    def auth(self) -> None:
+        """Refresh JWT with the same timeout and retry policy as read requests."""
+        now = int(time.time())
+        if self.jwt_token and now - self.jwt_token_issued <= self.jwt_token_ttl:
+            return
+
+        with self._auth_lock:
+            now = int(time.time())
+            if self.jwt_token and now - self.jwt_token_issued <= self.jwt_token_ttl:
+                return
+
+            response = self._call_rpc(
+                self.auth_stub.Auth,
+                AuthRequest(secret=self.access_token),
+                max_attempts=self.request_max_attempts,
+            )
+            self.jwt_token = response.token
+            self.jwt_token_issued = now
+            self.metadata = ("authorization", self.jwt_token)
+
+    def token_details(self):
+        """Get token details without an unbounded RPC during client startup."""
+        self.auth()
+        return self._call_rpc(
+            self.auth_stub.TokenDetails,
+            TokenDetailsRequest(token=self.jwt_token),
+            max_attempts=self.request_max_attempts,
+        )
+
+    def call_function(self, func, request, *, retry: bool = True):
+        self.auth()
+        max_attempts = self.request_max_attempts if retry else 1
+        return self._call_rpc(
+            func,
+            request,
+            metadata=(self.metadata,),
+            max_attempts=max_attempts,
+        )
 
 
 def create_finam_service(config: dict[str, Any]) -> FinamBrokerService:
@@ -40,23 +140,19 @@ def create_finam_service(config: dict[str, Any]) -> FinamBrokerService:
 class FinamBrokerService(BrokerService):
     def __init__(self, config: FinamConfig) -> None:
         self.config = config
-        self._client = FinamPy(self.config.token)
+        self._client = FinamApiClient(
+            self.config.token,
+            request_timeout=self.config.request_timeout,
+            request_max_attempts=self.config.request_max_attempts,
+        )
 
     def close(self) -> None:
         """Close the gRPC channel before interpreter shutdown."""
         self._client.close_channel()
     
-    def call_function(self, func, request):
-        """Call FinamPy function (fork of _client.call_function with proper error handling)"""
-        self._client.auth()
-
-        try:
-            response, _ = func.with_call(request=request, metadata=(self._client.metadata,))
-            return response
-        except RpcError as ex:
-            details = ex.args[0].details
-            raise TradingError(code="FINAM_REQUEST_ERROR",
-                                message=f"Finam request error: {details}")
+    def call_function(self, func, request, *, retry: bool = True):
+        """Call a Finam function with the configured timeout and retry policy."""
+        return self._client.call_function(func, request, retry=retry)
 
     def get_instrument_info(self, instrument: str, max_attempts: int = 20, delay: float = 0.250) -> Optional[InstrumentInfo]:
         """Get instrument details waiting for them to be ready"""
@@ -190,7 +286,9 @@ class FinamBrokerService(BrokerService):
                 quantity=Decimal(value=str(quantity)),
                 side=SIDE_SELL if direction == "sell" else SIDE_BUY,
                 type=ORDER_TYPE_MARKET
-            ))
+            ),
+            retry=False,
+        )
         
         logger.info(f"Placed market {direction} order for {quantity} lots of {instrument_info.instrument}, order_id: {order.order_id}")
         return order.order_id
@@ -207,7 +305,9 @@ class FinamBrokerService(BrokerService):
                 stop_price=Decimal(value=str(stop_price)),
                 stop_condition=STOP_CONDITION_LAST_DOWN if direction == "sell" else STOP_CONDITION_LAST_UP,
                 valid_before=VALID_BEFORE_GOOD_TILL_CANCEL,
-            ))
+            ),
+            retry=False,
+        )
         
         logger.info(f"Placed stop loss order for {quantity} lots of {instrument_info.instrument} at {stop_price}, order_id: {order.order_id}")
         return order.order_id
@@ -225,7 +325,9 @@ class FinamBrokerService(BrokerService):
                 stop_price=Decimal(value=str(take_price)),
                 stop_condition=STOP_CONDITION_LAST_UP if direction == "sell" else STOP_CONDITION_LAST_DOWN,
                 valid_before=VALID_BEFORE_GOOD_TILL_CANCEL,
-            ))
+            ),
+            retry=False,
+        )
         
         logger.info(f"Placed take profit order for {quantity} lots of {instrument_info.instrument} at {take_price}, order_id: {order.order_id}")
         return order.order_id
@@ -234,7 +336,10 @@ class FinamBrokerService(BrokerService):
         """Cancel stop orders"""
         for order in orders:
             self.call_function(
-                self._client.orders_stub.CancelOrder, CancelOrderRequest(account_id=self.config.account_id, order_id=order.order_id))
+                self._client.orders_stub.CancelOrder,
+                CancelOrderRequest(account_id=self.config.account_id, order_id=order.order_id),
+                retry=False,
+            )
             logger.info(f"Cancelled stop order {order.order_id}")
 
     def get_current_stop_orders(self, instrument_info: InstrumentInfo) -> list[StopOrder]:

@@ -40,16 +40,24 @@ RETRYABLE_STATUS_CODES = {
 class FinamConfig(BaseModel):
     token: str = Field(min_length=1)
     account_id: str = Field(min_length=1)
-    request_timeout: float = Field(default=10.0, gt=0)
-    request_max_attempts: int = Field(default=10, ge=1)
+    request_timeout: float = Field(default=5.0, gt=0)
+    request_max_attempts: int = Field(default=20, ge=1)
+    non_retryable_request_timeout: float = Field(default=30.0, gt=0)
 
 
 class FinamApiClient(FinamPy):
     """FinamPy client with bounded RPC calls and safe JWT refresh."""
 
-    def __init__(self, access_token: str, request_timeout: float, request_max_attempts: int) -> None:
+    def __init__(
+        self,
+        access_token: str,
+        request_timeout: float,
+        request_max_attempts: int,
+        non_retryable_request_timeout: float,
+    ) -> None:
         self.request_timeout = request_timeout
         self.request_max_attempts = request_max_attempts
+        self.non_retryable_request_timeout = non_retryable_request_timeout
         self._auth_lock = threading.RLock()
         super().__init__(access_token)
 
@@ -58,14 +66,15 @@ class FinamApiClient(FinamPy):
         method = getattr(func, "_method", b"unknown")
         return method.decode("utf-8") if isinstance(method, bytes) else str(method)
 
-    def _call_rpc(self, func, request, *, metadata=None, max_attempts: int):
+    def _call_rpc(self, func, request, *, metadata=None, max_attempts: int, timeout: float | None = None):
         rpc_name = self._rpc_name(func)
+        request_timeout = self.request_timeout if timeout is None else timeout
 
         for attempt in range(1, max_attempts + 1):
             try:
                 response, _ = func.with_call(
                     request=request,
-                    timeout=self.request_timeout,
+                    timeout=request_timeout,
                     metadata=metadata,
                 )
                 return response
@@ -123,11 +132,13 @@ class FinamApiClient(FinamPy):
     def call_function(self, func, request, *, retry: bool = True):
         self.auth()
         max_attempts = self.request_max_attempts if retry else 1
+        timeout = self.request_timeout if retry else self.non_retryable_request_timeout
         return self._call_rpc(
             func,
             request,
             metadata=(self.metadata,),
             max_attempts=max_attempts,
+            timeout=timeout,
         )
 
 
@@ -144,6 +155,7 @@ class FinamBrokerService(BrokerService):
             self.config.token,
             request_timeout=self.config.request_timeout,
             request_max_attempts=self.config.request_max_attempts,
+            non_retryable_request_timeout=self.config.non_retryable_request_timeout,
         )
 
     def close(self) -> None:

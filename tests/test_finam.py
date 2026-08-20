@@ -37,11 +37,14 @@ class FakeUnaryCall:
         return outcome, object()
 
 
-def make_client(*, timeout: float = 10.0, max_attempts: int = 10) -> FinamApiClient:
+def make_client(
+    *, timeout: float = 5.0, max_attempts: int = 20, non_retryable_timeout: float = 30.0
+) -> FinamApiClient:
     client = object.__new__(FinamApiClient)
     client.channel = None
     client.request_timeout = timeout
     client.request_max_attempts = max_attempts
+    client.non_retryable_request_timeout = non_retryable_timeout
     client._auth_lock = threading.RLock()
     return client
 
@@ -86,8 +89,9 @@ def instrument():
 def test_request_policy_defaults():
     config = FinamConfig(token="token", account_id="account")
 
-    assert config.request_timeout == 10.0
-    assert config.request_max_attempts == 10
+    assert config.request_timeout == 5.0
+    assert config.request_max_attempts == 20
+    assert config.non_retryable_request_timeout == 30.0
 
 
 @pytest.mark.parametrize(
@@ -95,6 +99,7 @@ def test_request_policy_defaults():
     [
         ("request_timeout", 0),
         ("request_max_attempts", 0),
+        ("non_retryable_request_timeout", 0),
     ],
 )
 def test_request_policy_must_be_positive(field, value):
@@ -142,7 +147,7 @@ def test_read_rpc_raises_after_max_attempts():
 
 
 def test_non_retryable_call_is_attempted_once(monkeypatch):
-    client = make_client(max_attempts=10)
+    client = make_client(max_attempts=20, non_retryable_timeout=30.0)
     monkeypatch.setattr(client, "auth", lambda: None)
     client.metadata = ("authorization", "jwt")
     rpc = FakeUnaryCall([FakeRpcError(StatusCode.DEADLINE_EXCEEDED)])
@@ -151,6 +156,7 @@ def test_non_retryable_call_is_attempted_once(monkeypatch):
         client.call_function(rpc, request=object(), retry=False)
 
     assert len(rpc.calls) == 1
+    assert rpc.calls[0]["timeout"] == 30.0
 
 
 def test_auth_uses_timeout_and_retry_policy():

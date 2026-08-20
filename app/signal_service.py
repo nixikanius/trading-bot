@@ -76,7 +76,8 @@ class SignalService:
             telegram_message = self.telegram.format_signal_result(
                 self.account_name, 
                 signal.model_dump(), 
-                result
+                result,
+                instrument_info,
             )
             self.telegram.send_message(telegram_message)
         

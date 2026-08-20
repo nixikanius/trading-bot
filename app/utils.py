@@ -1,4 +1,6 @@
+from decimal import Decimal, ROUND_HALF_UP
 from datetime import timedelta
+
 
 def format_duration(td: timedelta) -> str:
     """Format duration in a human-readable format"""
@@ -19,3 +21,16 @@ def format_duration(td: timedelta) -> str:
         parts.append(f"{seconds}s")
 
     return sign + "".join(parts)
+
+
+def price_decimals(min_price_step: float) -> int:
+    """Return the number of decimal places used by an instrument's price step."""
+    step = Decimal(str(min_price_step)).normalize()
+    return max(0, -step.as_tuple().exponent)
+
+def format_price(value: float, min_price_step: float) -> str:
+    """Round and render a price with the instrument's fixed precision."""
+    decimals = price_decimals(min_price_step)
+    quantum = Decimal(1).scaleb(-decimals)
+    rounded = Decimal(str(value)).quantize(quantum, rounding=ROUND_HALF_UP)
+    return f"{rounded:.{decimals}f}"

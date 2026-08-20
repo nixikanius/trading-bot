@@ -102,7 +102,7 @@ class TelegramService:
         
         if result.get('profit') is not None:
             profit_emoji = "🟢" if result['profit'] >= 0 else "🔴"
-            message += f"\n💰 <b>Profit</b>: {profit_emoji} <b>{result['profit']}</b>\n"
+            message += f"\n💰 <b>Profit</b>: {profit_emoji} <b>{format_instrument_price(result['profit'])}</b>\n"
 
         # Add position info
         if position := result.get('position'):

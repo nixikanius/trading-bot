@@ -32,7 +32,7 @@ def test_format_signal_result_uses_instrument_price_precision():
             EnsureOrder("stop_loss", 180, "sl", price=11895.34),
             EnsureOrder("take_profit", 180, "tp", price=12316.66),
         ],
-        "profit": None,
+        "profit": -128.049999999,
         "slippage": {"order-id": {"price": 0.07111111111, "amount": 390.0}},
         "position": Position("GLDRUBF@RTSX", 180, 12039.87111111111),
         "stop_orders": [
@@ -53,6 +53,7 @@ def test_format_signal_result_uses_instrument_price_precision():
     assert "SL: 180 lots @ 11895.3" in message
     assert "TP: 180 lots @ 12316.7" in message
     assert "Current Position:</b> <b>180</b> lots @ <b>12039.9</b>" in message
+    assert "Profit</b>: 🔴 <b>-128.0</b>" in message
     assert "@ <b>11895.3</b>" in message
     assert "@ <b>12316.7</b>" in message
 

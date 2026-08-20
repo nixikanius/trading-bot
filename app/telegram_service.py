@@ -84,7 +84,10 @@ class TelegramService:
                     
                     order_slippage_data = []
                     if (value := order_slippage.get('price')) is not None:
-                        order_slippage_data.append(format_instrument_price(value))
+                        price_slippage = format_instrument_price(value)
+                        if (amount := order_slippage.get('amount')) is not None:
+                            price_slippage += f" ({format_instrument_price(amount)})"
+                        order_slippage_data.append(price_slippage)
                     if (value := order_slippage.get('time')) is not None:
                         order_slippage_data.append(format_duration(value))
 

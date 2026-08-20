@@ -45,7 +45,7 @@ class SignalService:
             position, ensure_orders = self._handle_position_signal(signal, instrument_info, init_position)
         
         ensure_orders = self.broker.pull_ensure_orders_result(ensure_orders, instrument_info)
-        slippage = self._calculate_slippage(signal, ensure_orders)
+        slippage = self._calculate_slippage(signal, ensure_orders, instrument_info)
         profit = self._calculate_profit(instrument_info, init_position, ensure_orders)
         stop_orders = self.broker.get_current_stop_orders(instrument_info)
 
@@ -110,7 +110,7 @@ class SignalService:
             take_price=signal.limit_price
         )
     
-    def _calculate_slippage(self, signal: Signal, ensure_orders: list[EnsureOrder]) -> dict:
+    def _calculate_slippage(self, signal: Signal, ensure_orders: list[EnsureOrder], instrument_info: InstrumentInfo) -> dict:
         """Calculate slippage from signal and ensure orders"""
         if not signal.entry_price and not signal.entry_time:
             return {}
@@ -120,6 +120,8 @@ class SignalService:
         for ensure_order in ensure_orders:
             if ensure_order.type in ["buy", "sell"]:
                 price_slippage = None
+                amount_slippage = None
+
                 if signal.entry_price:
                     order_price = ensure_order.result.price
                     # slippage > 0: losing money, slippage < 0: making money
@@ -127,6 +129,8 @@ class SignalService:
                         price_slippage = float(Decimal(str(signal.entry_price)) - Decimal(str(order_price)))
                     else:
                         price_slippage = float(Decimal(str(order_price)) - Decimal(str(signal.entry_price)))
+
+                    amount_slippage = float(Decimal(str(price_slippage)) * ensure_order.quantity * Decimal(str(instrument_info.lot_size)))
                     
                 time_slippage = None
                 if signal.entry_time:
@@ -134,6 +138,7 @@ class SignalService:
                 
                 slippage[ensure_order.order_id] = {
                     "price": price_slippage,
+                    "amount": amount_slippage,
                     "time": time_slippage,
                 }
         

@@ -26,7 +26,11 @@ class SignalService:
 
     def process_signal(self, signal: Signal) -> dict:
         """Process trading signal and return result"""
-        logger.info(f"Processing signal for {self.account_name}: {signal.model_dump()}")
+        logger.info(
+            "Processing signal for %s: %s",
+            self.account_name,
+            signal.model_dump_json(),
+        )
 
         instrument_info = self.broker.get_instrument_info(signal.instrument)
         logger.info(f"Instrument info: {instrument_info}")

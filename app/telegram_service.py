@@ -11,7 +11,7 @@ logger = get_logger(__name__)
 class TelegramService:
     def __init__(self, config: TelegramConfig):
         self.config = config
-        self.base_url = f"https://api.telegram.org/bot{config.bot_token}"
+        self.base_url = f"{config.base_url.rstrip('/')}/bot{config.bot_token}"
 
     def send_message(self, text: str) -> bool:
         """Send message to Telegram chat"""

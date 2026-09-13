@@ -20,6 +20,7 @@ class ServerConfig(BaseModel):
 class TelegramConfig(BaseModel):
     bot_token: str
     chat_id: int
+    base_url: str = "https://api.telegram.org"
 
 class AppConfig(BaseModel):
     server: ServerConfig = Field(default_factory=lambda: ServerConfig())

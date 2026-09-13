@@ -4,6 +4,8 @@ server:
 
 # Telegram notifications
 telegram:
+  # Optional Telegram API base URL; override for a proxy
+  base_url: https://api.telegram.org
   bot_token: TELEGRAM_BOT_TOKEN
   chat_id: TELEGRAM_CHAT_ID
 

@@ -194,3 +194,46 @@ def test_all_order_mutations_disable_retries(mutation_service, instrument):
 
     assert len(calls) == 4
     assert all(kwargs == {"retry": False} for _, _, kwargs in calls)
+
+
+@pytest.mark.parametrize("status,remaining", [("ORDER_STATUS_NEW", "167.0"), ("ORDER_STATUS_PARTIALLY_FILLED", "100.0")])
+def test_cleanup_includes_limit_remainder(mutation_service, instrument, status, remaining):
+    from FinamPy.grpc import orders_service_pb2 as pb
+    from FinamPy.grpc.side_pb2 import SIDE_BUY
+
+    service, calls = mutation_service
+    service._client.orders_stub.GetOrders = object()
+    response = pb.OrdersResponse(orders=[pb.OrderState(
+        order_id="2030874826353094099",
+        status=getattr(pb, status),
+        order=pb.Order(
+            symbol=instrument.instrument,
+            quantity={"value": "167.0"},
+            side=SIDE_BUY,
+            type=pb.ORDER_TYPE_LIMIT,
+            limit_price={"value": "11553.7"},
+        ),
+        remaining_quantity={"value": remaining},
+    )])
+    mutation_call = service.call_function
+    service.call_function = lambda *args, **kwargs: response
+    orders = service.get_current_stop_orders(instrument)
+    assert len(orders) == 1
+    assert orders[0].quantity == int(float(remaining))
+    assert orders[0].direction == "buy"
+    assert orders[0].price == 11553.7
+    assert orders[0].stop_price is None
+    assert service._should_update_stop_orders(orders, None, None)
+    assert service._should_update_stop_orders(orders, None, 11553.7)
+    service.call_function = mutation_call
+    service.cancel_stop_orders(orders)
+    assert calls[0][1].order_id == "2030874826353094099"
+    assert calls[0][1].account_id == "account"
+
+    service.call_function = lambda *args, **kwargs: response
+    response.orders[0].order.symbol = "OTHER@RTSX"
+    assert service.get_current_stop_orders(instrument) == []
+    response.orders[0].order.symbol = instrument.instrument
+    for terminal_status in (pb.ORDER_STATUS_FILLED, pb.ORDER_STATUS_CANCELED, pb.ORDER_STATUS_EXPIRED, pb.ORDER_STATUS_REJECTED):
+        response.orders[0].status = terminal_status
+        assert service.get_current_stop_orders(instrument) == []

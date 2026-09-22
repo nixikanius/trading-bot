@@ -17,7 +17,8 @@ from FinamPy.grpc.accounts_service_pb2 import GetAccountRequest, TradesRequest, 
 from FinamPy.grpc.marketdata_service_pb2 import QuoteRequest
 from FinamPy.grpc.orders_service_pb2 import (
     Order, OrdersRequest, CancelOrderRequest,
-    ORDER_STATUS_WATCHING, ORDER_TYPE_MARKET, ORDER_TYPE_STOP, ORDER_TYPE_STOP_LIMIT,
+    ORDER_STATUS_WATCHING, ORDER_STATUS_NEW, ORDER_STATUS_PARTIALLY_FILLED,
+    ORDER_TYPE_MARKET, ORDER_TYPE_LIMIT, ORDER_TYPE_STOP, ORDER_TYPE_STOP_LIMIT,
     STOP_CONDITION_LAST_UP, STOP_CONDITION_LAST_DOWN, VALID_BEFORE_GOOD_TILL_CANCEL,
 )
 from FinamPy.grpc.side_pb2 import SIDE_BUY, SIDE_SELL
@@ -361,6 +362,23 @@ class FinamBrokerService(BrokerService):
             self._client.orders_stub.GetOrders, OrdersRequest(account_id=self.config.account_id))
         
         for order in orders_result.orders:
+            if order.order.symbol != instrument_info.instrument:
+                continue
+
+            # Include active limit orders assuming they all came from triggered take profits
+            if order.order.type == ORDER_TYPE_LIMIT and order.status in (
+                ORDER_STATUS_NEW, ORDER_STATUS_PARTIALLY_FILLED,
+            ):
+                current_orders.append(StopOrder(
+                    order_id=order.order_id,
+                    order_type="take_profit",
+                    direction="sell" if order.order.side == SIDE_SELL else "buy",
+                    quantity=int(float(order.remaining_quantity.value)),
+                    price=float(order.order.limit_price.value),
+                    exchange_order_type="limit",
+                ))
+                continue
+
             if order.status == ORDER_STATUS_WATCHING and order.order.type in [ORDER_TYPE_STOP, ORDER_TYPE_STOP_LIMIT] and \
                  order.order.symbol == instrument_info.instrument:
                 if order.order.stop_condition == STOP_CONDITION_LAST_DOWN and order.order.side == SIDE_SELL \
